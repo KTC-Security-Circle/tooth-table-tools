@@ -6,3 +6,8 @@
 .omc
 .venv
 .vscode
+build/
+dist/
+*.spec
+__pycache__/
+.pytest_cache/

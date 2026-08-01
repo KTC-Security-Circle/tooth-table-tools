@@ -34,10 +34,14 @@ static void handleCmd(const String& line) {
     String spd = getParam(line, "speed");
     String acc = getParam(line, "accel");
     String stp = getParam(line, "steps");
+    String mov = getParam(line, "move");
 
     if (spd.length()) { g_maxSpeed = spd.toFloat(); stepper.setMaxSpeed(g_maxSpeed); }
     if (acc.length()) { g_accel    = acc.toFloat(); stepper.setAcceleration(g_accel); }
     if (stp.length())   g_steps    = stp.toInt();
+
+    // 符号付き相対ステップ数を直接指定（角度→ステップ変換はPython側で計算済み）
+    if (mov.length()) stepper.move(mov.toInt());
 
     String action = getParam(line, "action");
     if      (action == "fwd")  stepper.move(g_steps);
