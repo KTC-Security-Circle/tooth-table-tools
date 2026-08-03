@@ -3,7 +3,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
 
-from turntable import STEPS_PER_DEGREE, angle_to_steps  # noqa: E402
+from turntable import STEPS_PER_DEGREE, angle_to_steps
 
 
 def test_zero_degrees():
