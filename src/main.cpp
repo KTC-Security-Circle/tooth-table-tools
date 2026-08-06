@@ -13,12 +13,6 @@ static String         serialBuf  = "";
 static unsigned long  lastStatus = 0;
 static const unsigned long STATUS_INTERVAL = 200;  // ms
 
-// ── スキャナー同期フック（将来実装） ─────────────────────────────────────────
-// 例: attachInterrupt(digitalPinToInterrupt(PIN_SCAN_DONE), onScanComplete, RISING);
-void onScanComplete() {
-    stepper.move(g_steps);
-}
-
 // ── ユーティリティ ────────────────────────────────────────────────────────────
 static String getParam(const String& line, const String& key) {
     String search = key + '=';
