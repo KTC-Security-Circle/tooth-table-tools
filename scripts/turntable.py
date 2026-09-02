@@ -17,8 +17,13 @@ try:
     import serial
     import serial.tools.list_ports
 except ImportError:
-    print("pyserial が見つかりません。  pip install pyserial  を実行してください。")
+    print("pyserial が見つかりません。  pip install pyserial  を実行してください。", file=sys.stderr)
     sys.exit(1)
+
+# ── 終了コード ────────────────────────────────────────────────────────────────
+EXIT_OK = 0
+EXIT_NO_DEVICE = 2
+EXIT_SERIAL_ERROR = 3
 
 # ── 設定 ──────────────────────────────────────────────────────────────────────
 BAUD_RATE = 115200
@@ -63,7 +68,7 @@ def send_move(ser: "serial.Serial", steps: int, speed: float | None = None, acce
     ser.write(line.encode())
 
 
-def main():
+def main() -> int:
     parser = argparse.ArgumentParser(prog="turntable", description="角度指定でターンテーブルを回転させる")
     parser.add_argument("angle", type=float, help="回転角度(度)。符号で方向を指定")
     parser.add_argument("--port", help="シリアルポート（省略時は自動検出）")
@@ -73,19 +78,24 @@ def main():
 
     port = args.port or find_port()
     if port is None:
-        print("Arduinoが見つかりません。USBケーブルを確認してください。")
-        sys.exit(1)
+        print("Arduinoが見つかりません。USBケーブルを確認してください。", file=sys.stderr)
+        return EXIT_NO_DEVICE
 
     steps = angle_to_steps(args.angle)
     print(f"シリアルポート: {port} ({BAUD_RATE} bps)")
     print(f"{args.angle} 度 -> {steps} steps")
 
-    with serial.Serial(port, BAUD_RATE, timeout=1) as ser:
-        time.sleep(2)  # Uno R4 のDTRリセット待ち（直後の送信は失われるため）
-        send_move(ser, steps, speed=args.speed, accel=args.accel)
+    try:
+        with serial.Serial(port, BAUD_RATE, timeout=1) as ser:
+            time.sleep(2)  # Uno R4 のDTRリセット待ち（直後の送信は失われるため）
+            send_move(ser, steps, speed=args.speed, accel=args.accel)
+    except serial.SerialException as e:
+        print(f"シリアル通信エラー: {e}", file=sys.stderr)
+        return EXIT_SERIAL_ERROR
 
     print("送信完了")
+    return EXIT_OK
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

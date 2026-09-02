@@ -58,3 +58,16 @@ move=1067&speed=1000&accel=500
 - `accel=<steps/sec^2>` — 省略可、加速度
 
 角度からステップ数への変換は `scripts/turntable.py` の `STEPS_PER_DEGREE`（モーター基本ステップ角・マイクロステップ設定・減速比から算出）に従います。
+
+## 他アプリケーションからの呼び出し
+
+`scripts/turntable.py`（および `make compile` で生成する `dist/turntable`）はサブプロセスとして呼び出すことを想定しており、以下の契約を守ります。
+
+- 進捗メッセージは stdout、エラーメッセージは stderr に出力
+- 終了コード:
+  - `0` — 正常終了
+  - `1` — pyserial 未インストール
+  - `2` — Arduino（対象ポート）が見つからない
+  - `3` — シリアル通信エラー（ポートオープン/書き込み失敗）
+  - `2`（argparse標準） — 引数エラー（`angle` が数値でない等）
+- 送信は fire-and-forget。Arduino側の実行結果（JSON ステータス行）の確認は行わないため、確実性が必要な呼び出し元は別途シリアルを読んで `pos`/`running` を確認すること。
