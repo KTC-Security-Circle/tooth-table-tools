@@ -10,6 +10,7 @@ Tooth Turntable - 角度指定シリアル送信ツール
 """
 
 import argparse
+import json
 import sys
 import time
 
@@ -30,6 +31,7 @@ MOTOR_STEPS_PER_REV = 200    # モーター基本ステップ角 1.8°/step
 MICROSTEPPING = 16           # TB6600 側のマイクロステップ設定
 GEAR_RATIO = 1.0             # ターンテーブル出力1回転あたりのモーター回転数（減速比）
 STEPS_PER_DEGREE = MOTOR_STEPS_PER_REV * MICROSTEPPING * GEAR_RATIO / 360.0
+MOVE_TIMEOUT_SECONDS = 120.0
 
 
 def angle_to_steps(degrees: float) -> int:
@@ -63,6 +65,48 @@ def send_move(ser: "serial.Serial", steps: int, speed: float | None = None, acce
     ser.write(line.encode())
 
 
+def wait_for_move_completion(ser: "serial.Serial", timeout: float = MOVE_TIMEOUT_SECONDS) -> None:
+    """Wait for a firmware status transition from running to idle.
+
+    An idle status received before a running status is deliberately ignored: it
+    may be a status left over from before the command was accepted.
+    """
+    deadline = time.monotonic() + timeout
+    observed_running = False
+
+    while time.monotonic() < deadline:
+        raw_line = ser.readline()
+        if not raw_line:
+            continue
+
+        try:
+            text = raw_line.decode("utf-8").strip() if isinstance(raw_line, bytes) else str(raw_line).strip()
+            status = json.loads(text)
+        except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+            raise RuntimeError(f"Invalid firmware status JSON: {raw_line!r}") from exc
+
+        if not isinstance(status, dict) or not isinstance(status.get("running"), bool):
+            raise RuntimeError(
+                "Firmware status is missing a boolean 'running' field: "
+                f"{text!r}"
+            )
+
+        if status["running"]:
+            observed_running = True
+        elif observed_running:
+            return
+
+    if observed_running:
+        raise TimeoutError(
+            f"Timed out after {timeout:g}s waiting for turntable move completion "
+            "(firmware remained running)"
+        )
+    raise TimeoutError(
+        f"Timed out after {timeout:g}s waiting for firmware status showing "
+        "the move running; check the serial connection and firmware"
+    )
+
+
 def main():
     parser = argparse.ArgumentParser(prog="turntable", description="角度指定でターンテーブルを回転させる")
     parser.add_argument("angle", type=float, help="回転角度(度)。符号で方向を指定")
@@ -83,6 +127,7 @@ def main():
     with serial.Serial(port, BAUD_RATE, timeout=1) as ser:
         time.sleep(2)  # Uno R4 のDTRリセット待ち（直後の送信は失われるため）
         send_move(ser, steps, speed=args.speed, accel=args.accel)
+        wait_for_move_completion(ser)
 
     print("送信完了")
 
