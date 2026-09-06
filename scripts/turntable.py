@@ -10,6 +10,7 @@ Tooth Turntable - 角度指定シリアル送信ツール
 """
 
 import argparse
+import json
 import sys
 import time
 
@@ -63,6 +64,46 @@ def send_move(ser: "serial.Serial", steps: int, speed: float | None = None, acce
     ser.write(line.encode())
 
 
+def wait_for_move_completion(ser: "serial.Serial") -> None:
+    """Wait for the move acknowledgement and then an idle firmware status.
+
+    An idle status received before the acknowledgement is deliberately ignored:
+    it may be a status left over from before the command was accepted. The
+    acknowledgement also makes zero-step and very short moves observable.
+    """
+    observed_ack = False
+
+    while True:
+        raw_line = ser.readline()
+        if not raw_line:
+            continue
+
+        try:
+            text = raw_line.decode("utf-8").strip() if isinstance(raw_line, bytes) else str(raw_line).strip()
+            status = json.loads(text)
+        except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+            raise RuntimeError(f"Invalid firmware status JSON: {raw_line!r}") from exc
+
+        if not isinstance(status, dict):
+            raise RuntimeError(
+                "Firmware status must be a JSON object: "
+                f"{text!r}"
+            )
+
+        if status.get("ack") == "move":
+            observed_ack = True
+            continue
+
+        if not isinstance(status.get("running"), bool):
+            raise RuntimeError(
+                "Firmware status is missing a boolean 'running' field: "
+                f"{text!r}"
+            )
+
+        if observed_ack and not status["running"]:
+            return
+
+
 def main():
     parser = argparse.ArgumentParser(prog="turntable", description="角度指定でターンテーブルを回転させる")
     parser.add_argument("angle", type=float, help="回転角度(度)。符号で方向を指定")
@@ -83,6 +124,7 @@ def main():
     with serial.Serial(port, BAUD_RATE, timeout=1) as ser:
         time.sleep(2)  # Uno R4 のDTRリセット待ち（直後の送信は失われるため）
         send_move(ser, steps, speed=args.speed, accel=args.accel)
+        wait_for_move_completion(ser)
 
     print("送信完了")
 
