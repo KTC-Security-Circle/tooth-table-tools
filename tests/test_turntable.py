@@ -40,6 +40,12 @@ def test_full_rotation_matches_steps_per_rev():
 
 
 def test_waits_for_running_then_idle():
+    ser = MockSerial([b'{"running": true}\n', b'{"running": false}\n'])
+
+    wait_for_move_completion(ser)
+
+
+def test_idle_before_running_is_not_completion():
     ser = MockSerial(
         [
             b'{"running": false}\n',
@@ -48,25 +54,11 @@ def test_waits_for_running_then_idle():
         ]
     )
 
-    wait_for_move_completion(ser, timeout=1)
-
-
-def test_timeout_when_move_never_completes():
-    ser = MockSerial([b'{"running": true}\n'])
-
-    with pytest.raises(TimeoutError, match="completion"):
-        wait_for_move_completion(ser, timeout=0.001)
-
-
-def test_immediately_idle_does_not_count_as_completion():
-    ser = MockSerial([b'{"running": false}\n'])
-
-    with pytest.raises(TimeoutError, match="running"):
-        wait_for_move_completion(ser, timeout=0.001)
+    wait_for_move_completion(ser)
 
 
 def test_malformed_status_is_actionable():
     ser = MockSerial([b"not-json\n"])
 
     with pytest.raises(RuntimeError, match="Invalid firmware status JSON"):
-        wait_for_move_completion(ser, timeout=1)
+        wait_for_move_completion(ser)

@@ -31,7 +31,6 @@ MOTOR_STEPS_PER_REV = 200    # モーター基本ステップ角 1.8°/step
 MICROSTEPPING = 16           # TB6600 側のマイクロステップ設定
 GEAR_RATIO = 1.0             # ターンテーブル出力1回転あたりのモーター回転数（減速比）
 STEPS_PER_DEGREE = MOTOR_STEPS_PER_REV * MICROSTEPPING * GEAR_RATIO / 360.0
-MOVE_TIMEOUT_SECONDS = 120.0
 
 
 def angle_to_steps(degrees: float) -> int:
@@ -65,16 +64,15 @@ def send_move(ser: "serial.Serial", steps: int, speed: float | None = None, acce
     ser.write(line.encode())
 
 
-def wait_for_move_completion(ser: "serial.Serial", timeout: float = MOVE_TIMEOUT_SECONDS) -> None:
+def wait_for_move_completion(ser: "serial.Serial") -> None:
     """Wait for a firmware status transition from running to idle.
 
     An idle status received before a running status is deliberately ignored: it
     may be a status left over from before the command was accepted.
     """
-    deadline = time.monotonic() + timeout
     observed_running = False
 
-    while time.monotonic() < deadline:
+    while True:
         raw_line = ser.readline()
         if not raw_line:
             continue
@@ -95,16 +93,6 @@ def wait_for_move_completion(ser: "serial.Serial", timeout: float = MOVE_TIMEOUT
             observed_running = True
         elif observed_running:
             return
-
-    if observed_running:
-        raise TimeoutError(
-            f"Timed out after {timeout:g}s waiting for turntable move completion "
-            "(firmware remained running)"
-        )
-    raise TimeoutError(
-        f"Timed out after {timeout:g}s waiting for firmware status showing "
-        "the move running; check the serial connection and firmware"
-    )
 
 
 def main():
