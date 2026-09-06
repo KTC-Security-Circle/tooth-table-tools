@@ -15,35 +15,35 @@ Arduino (Uno R4 WiFi) 製ターンテーブルのステッパーモーター制�
 
 ```sh
 # Python 依存関係をインストール
-make sync
+uv sync
 
 # ファームウェアをビルド
-make build
+uv run task build
 
 # Arduino へ書き込み
-make upload
+uv run task upload
 
 # シリアルモニタを開く（動作確認用）
-make monitor
+uv run task monitor
 
 # 45度正転させる（別ターミナルから）
-make move ANGLE=45
+ANGLE=45 uv run task move
 
 # -90度（逆転）
-make move ANGLE=-90
+ANGLE=-90 uv run task move
 
 # テスト・lint
-make test
-make lint
+uv run task test
+uv run task lint
 
 # CLI を単体実行ファイルにコンパイル（Nuitka）
-make compile
+uv run task compile
 
 # 上記を一通りまとめて実行（firmware build + compile + test + lint）
-make all
+uv run task all
 ```
 
-すべてのターゲットは `make help` で一覧表示できます。
+すべてのタスクは `uv run task --list` で一覧表示できます。
 
 ## シリアルプロトコル
 

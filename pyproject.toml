@@ -13,4 +13,20 @@ dependencies = [
 dev = [
     "pytest>=9.1.1",
     "ruff>=0.16.1",
+    "taskipy>=1.14.1",
 ]
+
+[tool.taskipy.tasks]
+build = "pio run -e uno_r4_wifi"
+upload = "pio run -e uno_r4_wifi -t upload"
+monitor = "pio device monitor"
+flash = "task upload && task monitor"
+clean = "pio run -e uno_r4_wifi -t clean"
+sync = "uv sync"
+install = "uv sync"
+test = "pytest"
+lint = "ruff check ."
+fmt = "ruff format ."
+move = "python scripts/turntable.py ${ANGLE}"
+compile = "nuitka --onefile --output-dir=dist --output-filename=turntable scripts/turntable.py"
+all = "task build && task compile && task test && task lint"
