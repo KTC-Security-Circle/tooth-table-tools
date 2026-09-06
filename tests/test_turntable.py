@@ -8,6 +8,7 @@ import pytest
 from turntable import (
     STEPS_PER_DEGREE,
     angle_to_steps,
+    send_move,
     wait_for_move_completion,
 )
 
@@ -15,6 +16,10 @@ from turntable import (
 class MockSerial:
     def __init__(self, statuses):
         self.statuses = iter(statuses)
+        self.writes = []
+
+    def write(self, data):
+        self.writes.append(data)
 
     def readline(self):
         try:
@@ -39,22 +44,31 @@ def test_full_rotation_matches_steps_per_rev():
     assert angle_to_steps(360) == round(STEPS_PER_DEGREE * 360)
 
 
-def test_waits_for_running_then_idle():
-    ser = MockSerial([b'{"running": true}\n', b'{"running": false}\n'])
+def test_waits_for_move_ack_then_idle():
+    ser = MockSerial([b'{"ack":"move"}\n', b'{"running": false}\n'])
 
     wait_for_move_completion(ser)
 
 
-def test_idle_before_running_is_not_completion():
+def test_idle_before_move_ack_is_not_completion():
     ser = MockSerial(
         [
             b'{"running": false}\n',
-            b'{"running": true}\n',
+            b'{"ack":"move"}\n',
             b'{"running": false}\n',
         ]
     )
 
     wait_for_move_completion(ser)
+
+
+@pytest.mark.parametrize("steps", [0, 1])
+def test_zero_or_short_move_can_ack_without_running_status(steps):
+    ser = MockSerial([b'{"ack":"move"}\n', b'{"running": false}\n'])
+
+    send_move(ser, steps)
+    wait_for_move_completion(ser)
+    assert ser.writes == [f"move={steps}\n".encode()]
 
 
 def test_malformed_status_is_actionable():

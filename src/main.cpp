@@ -35,7 +35,12 @@ static void handleCmd(const String& line) {
     if (stp.length())   g_steps    = stp.toInt();
 
     // 符号付き相対ステップ数を直接指定（角度→ステップ変換はPython側で計算済み）
-    if (mov.length()) stepper.move(mov.toInt());
+    if (mov.length()) {
+        stepper.move(mov.toInt());
+        // A move can finish before the next periodic status (including move=0),
+        // so acknowledge command acceptance immediately.
+        Serial.println(F("{\"ack\":\"move\"}"));
+    }
 
     String action = getParam(line, "action");
     if      (action == "fwd")  stepper.move(g_steps);

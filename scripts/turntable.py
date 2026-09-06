@@ -65,12 +65,13 @@ def send_move(ser: "serial.Serial", steps: int, speed: float | None = None, acce
 
 
 def wait_for_move_completion(ser: "serial.Serial") -> None:
-    """Wait for a firmware status transition from running to idle.
+    """Wait for the move acknowledgement and then an idle firmware status.
 
-    An idle status received before a running status is deliberately ignored: it
-    may be a status left over from before the command was accepted.
+    An idle status received before the acknowledgement is deliberately ignored:
+    it may be a status left over from before the command was accepted. The
+    acknowledgement also makes zero-step and very short moves observable.
     """
-    observed_running = False
+    observed_ack = False
 
     while True:
         raw_line = ser.readline()
@@ -83,15 +84,23 @@ def wait_for_move_completion(ser: "serial.Serial") -> None:
         except (UnicodeDecodeError, json.JSONDecodeError) as exc:
             raise RuntimeError(f"Invalid firmware status JSON: {raw_line!r}") from exc
 
-        if not isinstance(status, dict) or not isinstance(status.get("running"), bool):
+        if not isinstance(status, dict):
+            raise RuntimeError(
+                "Firmware status must be a JSON object: "
+                f"{text!r}"
+            )
+
+        if status.get("ack") == "move":
+            observed_ack = True
+            continue
+
+        if not isinstance(status.get("running"), bool):
             raise RuntimeError(
                 "Firmware status is missing a boolean 'running' field: "
                 f"{text!r}"
             )
 
-        if status["running"]:
-            observed_running = True
-        elif observed_running:
+        if observed_ack and not status["running"]:
             return
 
 
