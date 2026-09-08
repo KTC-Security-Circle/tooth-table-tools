@@ -8,6 +8,7 @@ import pytest
 from turntable import (
     STEPS_PER_DEGREE,
     angle_to_steps,
+    main,
     send_move,
     wait_for_move_completion,
 )
@@ -81,3 +82,16 @@ def test_malformed_status_is_actionable():
 def test_stop_waits_for_stop_ack_then_idle():
     ser = MockSerial([b'{"ack":"stop"}\n', b'{"running": false}\n'])
     wait_for_move_completion(ser, "stop")
+
+
+@pytest.mark.parametrize("option", ["--steps", "--zero", "--stop"])
+def test_angle_cannot_be_combined_with_action_options(monkeypatch, option):
+    arguments = ["turntable", "45", option]
+    if option == "--steps":
+        arguments.append("10")
+    monkeypatch.setattr(sys, "argv", arguments)
+
+    with pytest.raises(SystemExit) as exc_info:
+        main()
+
+    assert exc_info.value.code == 2

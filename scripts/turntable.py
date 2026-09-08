@@ -115,6 +115,8 @@ def main():
     parser.add_argument("--accel", type=float, help="加速度 (steps/sec^2)")
     args = parser.parse_args()
 
+    if args.angle is not None and (args.steps is not None or args.zero or args.stop):
+        parser.error("an angle cannot be combined with --steps, --zero, or --stop")
     port = args.port or find_port()
     if port is None:
         print("Arduinoが見つかりません。USBケーブルを確認してください。")
