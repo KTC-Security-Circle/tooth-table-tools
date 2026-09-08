@@ -76,3 +76,8 @@ def test_malformed_status_is_actionable():
 
     with pytest.raises(RuntimeError, match="Invalid firmware status JSON"):
         wait_for_move_completion(ser)
+
+
+def test_stop_waits_for_stop_ack_then_idle():
+    ser = MockSerial([b'{"ack":"stop"}\n', b'{"running": false}\n'])
+    wait_for_move_completion(ser, "stop")

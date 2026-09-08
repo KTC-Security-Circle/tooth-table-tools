@@ -45,8 +45,8 @@ static void handleCmd(const String& line) {
     String action = getParam(line, "action");
     if      (action == "fwd")  stepper.move(g_steps);
     else if (action == "rev")  stepper.move(-g_steps);
-    else if (action == "stop") stepper.stop();
-    else if (action == "home") stepper.setCurrentPosition(0);
+    else if (action == "stop") { stepper.stop(); Serial.println(F("{\"ack\":\"stop\"}")); }
+    else if (action == "home") { stepper.setCurrentPosition(0); Serial.println(F("{\"ack\":\"home\"}")); }
 }
 
 // ── Serial 受信（ノンブロッキング） ──────────────────────────────────────────
