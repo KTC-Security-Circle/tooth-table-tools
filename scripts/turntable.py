@@ -64,7 +64,7 @@ def send_move(ser: "serial.Serial", steps: int, speed: float | None = None, acce
     ser.write(line.encode())
 
 
-def wait_for_move_completion(ser: "serial.Serial") -> None:
+def wait_for_move_completion(ser: "serial.Serial", expected_ack: str = "move") -> None:
     """Wait for the move acknowledgement and then an idle firmware status.
 
     An idle status received before the acknowledgement is deliberately ignored:
@@ -90,7 +90,7 @@ def wait_for_move_completion(ser: "serial.Serial") -> None:
                 f"{text!r}"
             )
 
-        if status.get("ack") == "move":
+        if status.get("ack") == expected_ack:
             observed_ack = True
             continue
 
@@ -106,25 +106,40 @@ def wait_for_move_completion(ser: "serial.Serial") -> None:
 
 def main():
     parser = argparse.ArgumentParser(prog="turntable", description="角度指定でターンテーブルを回転させる")
-    parser.add_argument("angle", type=float, help="回転角度(度)。符号で方向を指定")
+    parser.add_argument("angle", nargs="?", type=float, help="回転角度(度)。符号で方向を指定")
+    parser.add_argument("--steps", type=int, help="相対ステップ数")
+    parser.add_argument("--zero", action="store_true", help="現在位置をゼロにする")
+    parser.add_argument("--stop", action="store_true", help="停止する")
     parser.add_argument("--port", help="シリアルポート（省略時は自動検出）")
     parser.add_argument("--speed", type=float, help="速度 (steps/sec)")
     parser.add_argument("--accel", type=float, help="加速度 (steps/sec^2)")
     args = parser.parse_args()
 
+    if args.angle is not None and (args.steps is not None or args.zero or args.stop):
+        parser.error("an angle cannot be combined with --steps, --zero, or --stop")
     port = args.port or find_port()
     if port is None:
         print("Arduinoが見つかりません。USBケーブルを確認してください。")
         sys.exit(1)
 
-    steps = angle_to_steps(args.angle)
+    if sum(bool(value) for value in (args.steps is not None, args.zero, args.stop)) > 1:
+        parser.error("--steps, --zero, and --stop are mutually exclusive")
+    if args.steps is None and not args.zero and not args.stop and args.angle is None:
+        parser.error("an angle, --steps, --zero, or --stop is required")
+    steps = args.steps if args.steps is not None else angle_to_steps(args.angle or 0)
     print(f"シリアルポート: {port} ({BAUD_RATE} bps)")
-    print(f"{args.angle} 度 -> {steps} steps")
+    if args.angle is not None:
+        print(f"{args.angle} 度 -> {steps} steps")
 
     with serial.Serial(port, BAUD_RATE, timeout=1) as ser:
         time.sleep(2)  # Uno R4 のDTRリセット待ち（直後の送信は失われるため）
-        send_move(ser, steps, speed=args.speed, accel=args.accel)
-        wait_for_move_completion(ser)
+        if args.zero or args.stop:
+            action = "home" if args.zero else "stop"
+            ser.write(f"action={action}\n".encode())
+            wait_for_move_completion(ser, "home" if args.zero else "stop")
+        else:
+            send_move(ser, steps, speed=args.speed, accel=args.accel)
+            wait_for_move_completion(ser)
 
     print("送信完了")
 
